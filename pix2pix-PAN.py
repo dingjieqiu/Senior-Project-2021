@@ -33,6 +33,7 @@ def get_images_batch(batch_size):
     return real_image,condition_image
 
 #-------------image save------------------
+"""
 def save_images(image_rows,num_images,epoch,cur_step):
     for i in range(3):
         image_shifted = image_rows[i]
@@ -55,7 +56,7 @@ def save_loss(step,gen_loss,disc_loss):
     plt.xlabel('Step')
     plt.legend(['generator','discriminator'],loc='upper left')
     plt.savefig(f"./loss_images/pix2pix_loss_chart.jpg")
-    
+""" 
 #------------network structure-------------------
 def crop(image,new_shape):
     middle_height = image.shape[2]//2
@@ -259,7 +260,7 @@ def train():
             gen_loss = get_gen_loss(gen,disc,real,condition,adv_criterion,recon_criterion,lambda_recon)
             gen_loss.backward()
             gen_opt.step()
-
+            """
             mean_discriminator_loss += disc_loss.item()/display_step
             mean_generator_loss += gen_loss.item()/display_step
             discriminator_loss_record.append(disc_loss.item())
@@ -271,15 +272,15 @@ def train():
                 mean_discriminator_loss = 0
                 save_images([condition,real,fake],batch_size,epoch)
             cur_step += 1
-
+            """
         if (epoch+1)%2 == 0:
             torch.save({'gen':gen.state_dict(),
                         'gen_opt':gen_opt.state_dict(),
                         'disc':disc.state_dict(),
                         'disc_opt':disc_opt.state_dict()
                         },f"./model/pix2pix_{epoch}.pth")
-            
-    save_loss(cur_step_record,generator_loss_record,discriminator_loss_record)
+    
+    #save_loss(cur_step_record,generator_loss_record,discriminator_loss_record)
 train()
             
 
