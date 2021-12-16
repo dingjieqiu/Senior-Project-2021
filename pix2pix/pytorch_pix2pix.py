@@ -2,8 +2,11 @@ import os, time, pickle, argparse, network, util
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import numpy as np
 from torchvision import transforms
 from torch.autograd import Variable
+import time
+import matplotlib.pyplot as plt
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--dataset', required=False, default='face2comics',  help='')
@@ -97,38 +100,42 @@ for epoch in range(opt.train_epoch):
         else:
             y_ = x_[:, :, :, img_size:]
             x_ = x_[:, :, :, 0:img_size]
-            
+
+        
         if img_size != opt.input_size:
             x_ = util.imgs_resize(x_, opt.input_size)
             y_ = util.imgs_resize(y_, opt.input_size)
-
         if opt.resize_scale:
             x_ = util.imgs_resize(x_, opt.resize_scale)
             y_ = util.imgs_resize(y_, opt.resize_scale)
-
         if opt.crop_size:
             x_, y_ = util.random_crop(x_, y_, opt.crop_size)
-
         if opt.fliplr:
             x_, y_ = util.random_fliplr(x_, y_)
 
+        #print(y_[0].cpu().numpy().transpose((1,2,0)).min(),y_[0].cpu().numpy().transpose((1,2,0)).max())
+        #print(x_[0].cpu().numpy().transpose((1,2,0)).min(),y_[0].cpu().numpy().transpose((1,2,0)).max())
+        #print(torch.mean(y_[0]), torch.mean(x_[0]))
+        """
+        plt.imshow((y_[0].cpu().numpy().transpose((1,2,0))+1)/2)
+        plt.show()
+        plt.imshow((x_[0].cpu().numpy().transpose((1,2,0))+1)/2)
+        plt.show()
+        """
         x_, y_ = Variable(x_.cuda()), Variable(y_.cuda())
-
         D_result = D(x_, y_).squeeze()
         D_real_loss = BCE_loss(D_result, Variable(torch.ones(D_result.size()).cuda()))
-
-        G_result = G(x_)
-        D_result = D(x_, G_result).squeeze()
+        with torch.no_grad():
+            G_result = G(x_)
+        D_result = D(x_, G_result.detach()).squeeze()
         D_fake_loss = BCE_loss(D_result, Variable(torch.zeros(D_result.size()).cuda()))
-
         D_train_loss = (D_real_loss + D_fake_loss) * 0.5
         D_train_loss.backward()
         D_optimizer.step()
+        train_hist['D_losses'].append(D_train_loss.data.item())
 
-        train_hist['D_losses'].append(D_train_loss.data[0])
-
-        D_losses.append(D_train_loss.data[0])
-
+        D_losses.append(D_train_loss.data.item())
+        
         # train generator G
         G.zero_grad()
 
@@ -138,20 +145,19 @@ for epoch in range(opt.train_epoch):
         G_train_loss = BCE_loss(D_result, Variable(torch.ones(D_result.size()).cuda())) + opt.L1_lambda * L1_loss(G_result, y_)
         G_train_loss.backward()
         G_optimizer.step()
+        train_hist['G_losses'].append(G_train_loss.data.item())
 
-        train_hist['G_losses'].append(G_train_loss.data[0])
-
-        G_losses.append(G_train_loss.data[0])
+        G_losses.append(G_train_loss.data.item())
 
         num_iter += 1
-
+        #time.sleep(15)
     epoch_end_time = time.time()
     per_epoch_ptime = epoch_end_time - epoch_start_time
 
     print('[%d/%d] - ptime: %.2f, loss_d: %.3f, loss_g: %.3f' % ((epoch + 1), opt.train_epoch, per_epoch_ptime, torch.mean(torch.FloatTensor(D_losses)),
                                                               torch.mean(torch.FloatTensor(G_losses))))
     fixed_p = root + 'Fixed_results/' + model + str(epoch + 1) + '.png'
-    util.show_result(G, Variable(fixed_x_.cuda(), volatile=True), fixed_y_, (epoch+1), save=True, path=fixed_p)
+    util.show_result(G, fixed_x_.cuda(), fixed_y_, (epoch+1), save=True, path=fixed_p)
     train_hist['per_epoch_ptimes'].append(per_epoch_ptime)
 
 end_time = time.time()

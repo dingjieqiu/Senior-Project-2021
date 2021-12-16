@@ -3,3 +3,7 @@ PAN:https://github.com/WANG-Chaoyue/PAN
 
 pix2pix:https://github.com/znxlwm/pytorch-pix2pix
 PAN:https://github.com/flowerofdream/pytorch-Perceptual-Adversarial-Networks
+
+
+2021/12/12
+目前看起來是資料吃進去的時候就已經壞掉了

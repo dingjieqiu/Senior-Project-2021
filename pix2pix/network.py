@@ -72,8 +72,7 @@ class generator(nn.Module):
         d7 = self.deconv7_bn(self.deconv7(F.relu(d6)))
         d7 = torch.cat([d7, e1], 1)
         d8 = self.deconv8(F.relu(d7))
-        o = F.tanh(d8)
-
+        o = torch.tanh(d8)
         return o
 
 class discriminator(nn.Module):
@@ -96,13 +95,27 @@ class discriminator(nn.Module):
 
     # forward method
     def forward(self, input, label):
+        """
+        print(input.shape)
+        print(input[0][0][128][120:130])
+        print(input[0][1][128][120:130])
+        print(input[0][2][128][120:130])
+        print('\n')
+        print(label.shape)
+        print(label[0][0][128][120:130])
+        print(label[0][1][128][120:130])
+        print(label[0][2][128][120:130])
+        print('\n')
+        """
         x = torch.cat([input, label], 1)
         x = F.leaky_relu(self.conv1(x), 0.2)
         x = F.leaky_relu(self.conv2_bn(self.conv2(x)), 0.2)
         x = F.leaky_relu(self.conv3_bn(self.conv3(x)), 0.2)
         x = F.leaky_relu(self.conv4_bn(self.conv4(x)), 0.2)
-        x = F.sigmoid(self.conv5(x))
-
+        x = torch.sigmoid(self.conv5(x))
+        #print(torch.mean(x))
+        #print(x[0][0][0])
+        #print('\n')
         return x
 
 def normal_init(m, mean, std):
