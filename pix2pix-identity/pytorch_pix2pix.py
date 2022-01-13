@@ -24,6 +24,7 @@ parser.add_argument('--train_epoch', type=int, default=20, help='number of train
 parser.add_argument('--lrD', type=float, default=0.0002, help='learning rate, default=0.0002')
 parser.add_argument('--lrG', type=float, default=0.0002, help='learning rate, default=0.0002')
 parser.add_argument('--L1_lambda', type=float, default=100, help='lambda for L1 loss')
+parser.add_argument('--idt_lambda', type=float, default=25, help='lambda for identity loss')
 parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for Adam optimizer')
 parser.add_argument('--beta2', type=float, default=0.999, help='beta2 for Adam optimizer')
 parser.add_argument('--save_root', required=False, default='results', help='results save path')
@@ -72,6 +73,7 @@ D.train()
 # loss
 BCE_loss = nn.BCELoss().cuda()
 L1_loss = nn.L1Loss().cuda()
+idt_loss = nn.MSELoss().cuda()
 
 # Adam optimizer
 G_optimizer = optim.Adam(G.parameters(), lr=opt.lrG, betas=(opt.beta1, opt.beta2))
@@ -133,7 +135,7 @@ for epoch in range(opt.train_epoch):
         D_train_loss.backward()
         D_optimizer.step()
         train_hist['D_losses'].append(D_train_loss.data.item())
-        print(D_train_loss)
+        #print(D_train_loss)
         D_losses.append(D_train_loss.data.item())
         
         # train generator G
@@ -141,12 +143,14 @@ for epoch in range(opt.train_epoch):
 
         G_result = G(x_)
         D_result = D(x_, G_result).squeeze()
-
-        G_train_loss = BCE_loss(D_result, Variable(torch.ones(D_result.size()).cuda())) + opt.L1_lambda * L1_loss(G_result, y_)
+        G_idt_result = G(y_)
+        G_pix_loss = opt.L1_lambda * L1_loss(G_result, y_)
+        G_idt_loss = opt.idt_lambda * idt_loss(G_idt_result, y_)
+        G_train_loss = BCE_loss(D_result, Variable(torch.ones(D_result.size()).cuda())) + G_pix_loss + G_idt_loss
         G_train_loss.backward()
         G_optimizer.step()
         train_hist['G_losses'].append(G_train_loss.data.item())
-        print(G_train_loss)
+        #print(G_train_loss)
         G_losses.append(G_train_loss.data.item())
 
         num_iter += 1

@@ -24,6 +24,10 @@ parser.add_argument('--train_epoch', type=int, default=20, help='number of train
 parser.add_argument('--lrD', type=float, default=0.0002, help='learning rate, default=0.0002')
 parser.add_argument('--lrG', type=float, default=0.0002, help='learning rate, default=0.0002')
 parser.add_argument('--L1_lambda', type=float, default=100, help='lambda for L1 loss')
+parser.add_argument('--p1_lambda', type=float, default=6.5, help='lambda for p1 loss')
+parser.add_argument('--p2_lambda', type=float, default=3, help='lambda for p2 loss')
+parser.add_argument('--gan_lambda', type=float, default=1, help='lambda for gan loss')
+parser.add_argument('--pan_m', type=float, default=2, help='maximum for pan loss')
 parser.add_argument('--beta1', type=float, default=0.5, help='beta1 for Adam optimizer')
 parser.add_argument('--beta2', type=float, default=0.999, help='beta2 for Adam optimizer')
 parser.add_argument('--save_root', required=False, default='results', help='results save path')
@@ -72,7 +76,8 @@ D.train()
 # loss
 BCE_loss = nn.BCELoss().cuda()
 L1_loss = nn.L1Loss().cuda()
-
+pan_loss = nn.L1Loss().cuda()
+pan_m = torch.tensor(opt.pan_m).cuda()
 # Adam optimizer
 G_optimizer = optim.Adam(G.parameters(), lr=opt.lrG, betas=(opt.beta1, opt.beta2))
 D_optimizer = optim.Adam(D.parameters(), lr=opt.lrD, betas=(opt.beta1, opt.beta2))
@@ -123,17 +128,24 @@ for epoch in range(opt.train_epoch):
         plt.show()
         """
         x_, y_ = Variable(x_.cuda()), Variable(y_.cuda())
-        D_result = D(x_, y_).squeeze()
-        D_real_loss = BCE_loss(D_result, Variable(torch.ones(D_result.size()).cuda()))
+        D_real_result = D(x_, y_).squeeze()
+        D_real_loss = BCE_loss(D_real_result, Variable(torch.ones(D_real_result.size()).cuda()))
         with torch.no_grad():
             G_result = G(x_)
-        D_result = D(x_, G_result.detach()).squeeze()
-        D_fake_loss = BCE_loss(D_result, Variable(torch.zeros(D_result.size()).cuda()))
-        D_train_loss = (D_real_loss + D_fake_loss) * 0.5
+        D_fake_result = D(x_, G_result.detach()).squeeze()
+        D_fake_loss = BCE_loss(D_fake_result, Variable(torch.zeros(D_fake_result.size()).cuda()))
+        D_gan_loss = (D_real_loss + D_fake_loss) * 0.5
+
+        D_real_p1,D_real_p2 = D.get_perception(x_, y_)
+        D_fake_p1,D_fake_p2 = D.get_perception(x_, G_result.detach())
+        D_p1_loss = pan_loss(D_real_p1, D_fake_p1) * opt.p1_lambda
+        D_p2_loss = pan_loss(D_real_p2, D_fake_p2) * opt.p2_lambda
+        D_pan_loss = D_p1_loss+D_p2_loss
+        D_train_loss = opt.gan_lambda * D_gan_loss + torch.max((pan_m - D_pan_loss), torch.tensor(0).float().cuda())
         D_train_loss.backward()
         D_optimizer.step()
         train_hist['D_losses'].append(D_train_loss.data.item())
-        print(D_train_loss)
+        #print(D_train_loss)
         D_losses.append(D_train_loss.data.item())
         
         # train generator G
@@ -142,11 +154,17 @@ for epoch in range(opt.train_epoch):
         G_result = G(x_)
         D_result = D(x_, G_result).squeeze()
 
-        G_train_loss = BCE_loss(D_result, Variable(torch.ones(D_result.size()).cuda())) + opt.L1_lambda * L1_loss(G_result, y_)
+        G_gan_loss = BCE_loss(D_result, Variable(torch.ones(D_result.size()).cuda())) + opt.L1_lambda * L1_loss(G_result, y_)
+        G_real_p1,G_real_p2 = D.get_perception(x_, y_)
+        G_fake_p1,G_fake_p2 = D.get_perception(x_, G_result)
+        G_p1_loss = pan_loss(G_real_p1, G_fake_p1) * opt.p1_lambda
+        G_p2_loss = pan_loss(G_real_p2, G_fake_p2) * opt.p2_lambda
+        G_pan_loss = G_p1_loss+G_p2_loss
+        G_train_loss = opt.gan_lambda * G_gan_loss + G_pan_loss
         G_train_loss.backward()
         G_optimizer.step()
         train_hist['G_losses'].append(G_train_loss.data.item())
-        print(G_train_loss)
+        #print(G_train_loss)
         G_losses.append(G_train_loss.data.item())
 
         num_iter += 1

@@ -28,7 +28,7 @@ if not os.path.isdir(opt.dataset + '_results/test_results'):
 
 G = network.generator(opt.ngf)
 G.cuda()
-G.load_state_dict(torch.load(opt.dataset + '_results1/' + opt.dataset + '_generator_param.pkl'))
+G.load_state_dict(torch.load(opt.dataset + '_results/' + opt.dataset + '_generator_param.pkl'))
 """
 D = network.discriminator(opt.ngf)
 D.cuda()

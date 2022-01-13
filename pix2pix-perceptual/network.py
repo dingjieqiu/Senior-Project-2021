@@ -107,6 +107,14 @@ class discriminator(nn.Module):
         #print('\n')
         return x
 
+    def get_perception(self, input, label):
+        x = torch.cat([input, label], 1)
+        x1 = F.leaky_relu(self.conv1(x), 0.2)
+        x2 = F.leaky_relu(self.conv2_bn(self.conv2(x1)), 0.2)
+        x3 = F.leaky_relu(self.conv3_bn(self.conv3(x2)), 0.2)
+        x4 = F.leaky_relu(self.conv4_bn(self.conv4(x3)), 0.2)
+        return x1, x3
+
 def normal_init(m, mean, std):
     if isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Conv2d):
         m.weight.data.normal_(mean, std)
